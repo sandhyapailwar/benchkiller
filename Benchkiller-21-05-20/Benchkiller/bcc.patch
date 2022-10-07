@@ -1,0 +1,99 @@
+:100644 100644 68078cf 0000000 M	agent.py
+:100644 100644 8dad437 0000000 M	campaign/admin/activity_admin.py
+:100644 100644 bcfab57 0000000 M	campaign/admin/campaign_admin.py
+:100644 100644 64113a6 0000000 M	campaign/models/activity.py
+:100644 100644 9846a03 0000000 M	campaign/models/campaign.py
+:100644 100644 578a211 0000000 M	campaign/services/wave_wizard.py
+
+diff --git a/agent.py b/agent.py
+index 68078cf..9ec4d5d 100644
+--- a/agent.py
++++ b/agent.py
+@@ -28,6 +28,11 @@ def main(**kwargs):
+                 if recipient
+                 else ";".join([c["email"] for c in activity["other_contacts"]])
+             )
++            recipient_bcc = (
++                None
++                if recipient
++                else ";".join([c["email"] for c in activity["bcc_contacts"]])
++            )
+             send_mail_via_com(
+                 subject=subject,
+                 recipient_to=recipient_to,
+diff --git a/campaign/admin/activity_admin.py b/campaign/admin/activity_admin.py
+index 8dad437..e5f5076 100644
+--- a/campaign/admin/activity_admin.py
++++ b/campaign/admin/activity_admin.py
+@@ -38,7 +38,7 @@ class ActivityAdmin(admin.ModelAdmin):
+         ("campaign", "state"),
+         # ("opportunity", "role"),
+         "contact",
+-        "other_contacts",
++        ("other_contacts", "bcc_contacts"),
+         "subject",
+         ("body", "html_body"),
+         "comment",
+diff --git a/campaign/admin/campaign_admin.py b/campaign/admin/campaign_admin.py
+index bcfab57..ddb7285 100644
+--- a/campaign/admin/campaign_admin.py
++++ b/campaign/admin/campaign_admin.py
+@@ -64,7 +64,7 @@ class CampaignAdmin(admin.ModelAdmin):
+     fields = (
+         ("name", "aggregate_activities"),
+         # ("start", "end"),
+-        "cc",
++        ("cc", "bcc"),
+         "subject",
+         ("template", "html_template"),
+     )
+diff --git a/campaign/models/activity.py b/campaign/models/activity.py
+index 64113a6..e029b8e 100644
+--- a/campaign/models/activity.py
++++ b/campaign/models/activity.py
+@@ -66,6 +66,10 @@ class Activity(models.Model):
+         "crm.Contact", related_name="other_contact_activities", blank=True
+     )
+ 
++    bcc_contacts = models.ManyToManyField(
++        "crm.Contact", related_name="bcc_contacts_activities", blank=True
++    )
++
+     subject = models.TextField(null=True, blank=True)
+     body = models.TextField(null=True, blank=True)
+     html_body = models.TextField(null=True, blank=True)
+diff --git a/campaign/models/campaign.py b/campaign/models/campaign.py
+index 9846a03..94f7eca 100644
+--- a/campaign/models/campaign.py
++++ b/campaign/models/campaign.py
+@@ -30,6 +30,9 @@ class Campaign(models.Model):
+     cc = models.ManyToManyField(
+         "crm.Contact", related_name="campaign_cc_contacts", blank=True
+     )
++    bcc = models.ManyToManyField(
++        "crm.Contact", related_name="campaign_bcc_contacts", blank=True
++    )
+ 
+     def __str__(self):
+         return f"{self.name}"
+diff --git a/campaign/services/wave_wizard.py b/campaign/services/wave_wizard.py
+index 578a211..a80b271 100644
+--- a/campaign/services/wave_wizard.py
++++ b/campaign/services/wave_wizard.py
+@@ -88,11 +88,16 @@ def wave_create_activity(
+         activity = Activity.objects.create(**activity_params)
+         for cc in wave.campaign.cc.all():
+             activity.other_contacts.add(cc)
++        for bcc in wave.campaign.bcc.all():
++            activity.bcc_contacts.add(bcc)
+     else:
+         activity, created = Activity.objects.get_or_create(**activity_params)
+         activity.other_contacts.remove()
++        activity.bcc_contacts.remove()
+         for cc in wave.campaign.cc.all():
+             activity.other_contacts.add(cc)
++        for bcc in wave.campaign.bcc.all():
++            activity.bcc_contacts.add(bcc)
+ 
+     ActivityOpportunityContact.objects.create(
+         opportunity_contact=opportunity_contact,

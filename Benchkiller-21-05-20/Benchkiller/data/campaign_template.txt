@@ -1,0 +1,15 @@
+{{ custom.greetings }}
+
+{% if not role %}
+{{ custom.body_roles }}
+{% for role in roles %}
+  - {{ role.name }} ({{ role.opportunity.opportunity_name }})
+{% endfor %}
+{% else %}
+{{ custom.body_role }}
+{% endif %}
+
+{{ custom.footer_desc }}
+
+{{ custom.footer_regards }}
+{{ custom.department }}
